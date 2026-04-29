@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSTI阴影自我类型测试 | 完整版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#6366f1',
+                        secondary: '#4f46e5',
+                        dark: '#0f172a',
+                        darklight: '#1e293b',
+                        graytext: '#cbd5e1',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .text-shadow {
+                text-shadow: 0 0 12px rgba(99, 102, 241, 0.6);
+            }
+            .card-glow {
+                box-shadow: 0 0 20px rgba(99, 102, 241, 0.15);
+            }
+            .option-hover {
+                transition: all 0.25s ease;
+            }
+            .option-hover:hover {
+                background-color: rgba(99, 102, 241, 0.2);
+                border-color: #6366f1;
+                transform: translateX(6px);
+            }
+        }
+    </style>
+</head>
+<body class="bg-dark text-white min-h-screen font-sans">
+    <div id="app" class="max-w-3xl mx-auto px-4 py-10">
+        <!-- 首页 -->
+        <section id="home-page" class="block">
+            <div class="text-center mb-12">
+                <h1 class="text-[clamp(2rem,5vw,3.5rem)] font-bold text-primary text-shadow mb-3">SSTI阴影自我测试</h1>
+                <p class="text-graytext text-lg mb-2">Shadow Self Type Indicator · 完整版</p>
+                <p class="text-graytext text-sm">看见你潜意识里的阴影自我</p>
+            </div>
+
+            <div class="bg-darklight rounded-2xl p-6 mb-8 card-glow">
+                <h2 class="text-xl font-bold mb-4 text-white">测试官方定位</h2>
+                <p class="text-graytext leading-relaxed">
+                    本测试以荣格原型心理学核心的阴影自我理论为底层奠基，结合人格心理学领域主流认可的黑暗三联征、黑暗四联体理论体系，严格遵循经典测验理论（CTT）的标准化测量规范，对标MBTI的四维度二分法16型分型逻辑，是为大众打造的「内在阴影自我探索工具」，无好坏对错之分，非临床心理诊断依据。
+                </p>
+            </div>
+
+            <div class="bg-darklight rounded-2xl p-6 mb-10">
+                <h2 class="text-xl font-bold mb-4 text-white">答题规则</h2>
+                <p class="text-graytext leading-relaxed mb-4">
+                    请仔细阅读每一道题目，根据你真实的想法与行为习惯作答，而非社会期待的“正确答案”。
+                </p>
+                <div class="grid grid-cols-5 gap-2 mb-4">
+                    <div class="border border-graytext rounded-lg p-2 text-center text-sm">
+                        <p class="font-bold text-white">1</p>
+                        <p class="text-graytext">完全不符合</p>
+                    </div>
+                    <div class="border border-graytext rounded-lg p-2 text-center text-sm">
+                        <p class="font-bold text-white">2</p>
+                        <p class="text-graytext">不太符合</p>
+                    </div>
+                    <div class="border border-graytext rounded-lg p-2 text-center text-sm">
+                        <p class="font-bold text-white">3</p>
+                        <p class="text-graytext">中立/不确定</p>
+                    </div>
+                    <div class="border border-graytext rounded-lg p-2 text-center text-sm">
+                        <p class="font-bold text-white">4</p>
+                        <p class="text-graytext">比较符合</p>
+                    </div>
+                    <div class="border border-graytext rounded-lg p-2 text-center text-sm">
+                        <p class="font-bold text-white">5</p>
+                        <p class="text-graytext">完全符合</p>
+                    </div>
+                </div>
+                <p class="text-red-400 text-sm">本测试共40道单选题，预计完成时间5-8分钟</p>
+            </div>
+
+            <div class="text-center">
+                <button id="start-test" class="bg-primary hover:bg-secondary transition-all duration-300 text-white font-bold py-4 px-10 rounded-full text-lg card-glow">
+                    <i class="fa fa-play-circle mr-2"></i>开始测试
+                </button>
+            </div>
+        </section>
+
+        <!-- 答题页 -->
+         <section id="test-page" class="hidden">
+             <div class="mb-8">
+                 <div class="flex justify-between items-center mb-3">
+                     <h2 class="text-xl font-bold text-primary">SSTI阴影自我测试</h2>
+                     <p id="progress-text" class="text-graytext font-medium">0/40</p>
+                 </div>
+                 <div class="w-full bg-darklight rounded-full h-2 overflow-hidden">
+                     <div id="progress-bar" class="bg-primary h-full rounded-full transition-all duration-300 w-0"></div>
+                 </div>
+             </div>
+             <div id="question-container" class="mb-10">
+                 <!-- 题目动态渲染 -->
+             </div>
+             <div class="flex justify-between items-center">
+                 <button id="prev-question" class="border border-graytext hover:border-primary hover:text-primary transition-all duration-300 text-graytext py-3 px-6 rounded-full hidden">
+                     <i class="fa fa-arrow-left mr-2"></i>上一题
+                 </button>
+                 <button id="next-question" class="bg-primary hover:bg-secondary transition-all duration-300 text-white font-bold py-3 px-8 rounded-full ml-auto">
+                     下一题<i class="fa fa-arrow-right ml-2"></i>
+                 </button>
+                 <button id="submit-test" class="bg-primary hover:bg-secondary transition-all duration-300 text-white font-bold py-3 px-8 rounded-full ml-auto hidden">
+                     提交测试<i class="fa fa-check-circle ml-2"></i>
+                 </button>
+             </div>
+         </section>
+         <!-- 结果页 -->
+         <section id="result-page" class="hidden">
+             <div class="text-center mb-10">
+                 <p class="text-graytext mb-2">你的阴影自我类型是</p>
+                 <h1 id="result-type" class="text-[clamp(2.5rem,6vw,4rem)] font-bold text-primary text-shadow mb-2">----</h1>
+                 <h2 id="result-name" class="text-[clamp(1.2rem,3vw,1.8rem)] font-semibold text-white mb-4">—— ----</h2>
+             </div>
+             <div class="bg-darklight rounded-2xl p-6 mb-8 card-glow">
+                 <h3 class="text-xl font-bold mb-4 text-white border-b border-primary/30 pb-2">核心人设</h3>
+                 <p id="result-desc" class="text-graytext leading-relaxed">--</p>
+             </div>
+             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                 <div class="bg-darklight rounded-2xl p-6">
+                     <h3 class="text-lg font-bold mb-3 text-white">阴影根源</h3>
+                     <p id="result-root" class="text-graytext leading-relaxed">--</p>
+                 </div>
+                 <div class="bg-darklight rounded-2xl p-6">
+                     <h3 class="text-lg font-bold mb-3 text-white">核心特质</h3>
+                     <p id="result-trait" class="text-graytext leading-relaxed">--</p>
+                 </div>
+             </div>
+             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                 <div class="bg-darklight rounded-2xl p-6">
+                     <h3 class="text-lg font-bold mb-3 text-white">潜在优势</h3>
+                     <p id="result-advantage" class="text-graytext leading-relaxed">--</p>
+                 </div>
+                 <div class="bg-darklight rounded-2xl p-6">
+                     <h3 class="text-lg font-bold mb-3 text-white">阴影风险</h3>
+                     <p id="result-risk" class="text-graytext leading-relaxed">--</p>
+                 </div>
+             </div>
+             <div class="bg-darklight rounded-2xl p-6 mb-8">
+                 <h3 class="text-xl font-bold mb-4 text-white border-b border-primary/30 pb-2">给你的建议</h3>
+                 <p id="result-suggest" class="text-graytext leading-relaxed">--</p>
+             </div>
+             <div class="bg-darklight rounded-2xl p-6 mb-10">
+                 <h3 class="text-xl font-bold mb-4 text-white border-b border-primary/30 pb-2">你的维度得分详情</h3>
+                 <div id="dimension-detail" class="space-y-4">
+                     <!-- 维度详情动态渲染 -->
+                 </div>
+             </div>
+             <div class="flex flex-col sm:flex-row justify-center gap-4 mb-10">
+                 <button id="copy-result" class="bg-primary hover:bg-secondary transition-all duration-300 text-white font-bold py-3 px-8 rounded-full">
+                     <i class="fa fa-copy mr-2"></i>一键复制结果
+                 </button>
+                 <button id="restart-test" class="border border-primary hover:bg-primary/10 transition-all duration-300 text-primary font-bold py-3 px-8 rounded-full">
+                     <i class="fa fa-refresh mr-2"></i>重新测试
+                 </button>
+             </div>
+             <div class="text-center text-graytext text-sm">
+                 <p class="mb-2">荣格曾说过：与其做一个好人，不如做一个完整的人。</p>
+                 <p class="mb-4">完整的人格，从来不是只有光明、没有黑暗，而是看见并接纳自己的阴影自我，让光明与阴影和解。</p>
+                 <p>本次测试仅为娱乐性测试，所有结果仅供参考。非临床心理诊断依据，若有持续的心理困扰，建议寻求专业心理咨询师的帮助。</p>
+             </div>
+        </section>
+     </div>
+     <script>
+         // 1. 100%匹配文档的测试题目
+         const questions = [
+             // 动机维度 V/G
+             { id: 1, text: "只有当别人先冒犯、伤害我之后，我才会对其展开反击。", dimension: "V", type: "V" },
+             { id: 2, text: "为了拿到我想要的利益，我可以不择手段达到目的，哪怕会损害他人的利益。", dimension: "V", type: "G" },
+             { id: 3, text: "我所有的“黑化”行为，本质上都是为了自保，而非主动攻击他人。", dimension: "V", type: "V" },
+             { id: 4, text: "我从不避讳自己的野心，会主动争取所有能让我向上走的机会，哪怕需要踩着别人的肩膀。", dimension: "V", type: "G" },
+             { id: 5, text: "别人对我的伤害，我一定会记在心里，找机会加倍奉还。", dimension: "V", type: "V" },
+             { id: 6, text: "我认为人际交往的本质是价值交换，能为我带来利益的关系，才值得我投入精力。", dimension: "V", type: "G" },
+             { id: 7, text: "我不会主动挑事，但如果有人惹到我，我绝对不会忍气吞声。", dimension: "V", type: "V" },
+             { id: 8, text: "面对竞争时，我会优先考虑如何赢，而非会不会伤害到竞争对手。", dimension: "V", type: "G" },
+             { id: 9, text: "我很难放下曾经被背叛、被伤害的经历，复仇的念头会一直萦绕在我心里。", dimension: "V", type: "V" },
+             { id: 10, text: "我认为弱肉强食是世界的底层规则，强者掠夺资源是天经地义的事情。", dimension: "V", type: "G" },
+             
+             // 情绪维度 F/R
+             { id: 11, text: "我能很轻易地看穿别人的情绪弱点，并利用这些弱点让对方听我的话。", dimension: "F", type: "F" },
+             { id: 12, text: "我很难对别人的痛苦感同身受，哪怕是亲近的人，也很难让我产生情绪波动。", dimension: "F", type: "R" },
+             { id: 13, text: "我擅长用温柔、共情的话术拉近和别人的距离，让对方对我放下防备。", dimension: "F", type: "F" },
+             { id: 14, text: "我认为情绪是成事的累赘，理性永远应该凌驾于情感之上。", dimension: "F", type: "R" },
+             { id: 15, text: "我可以一边在表面上安慰别人，一边在心里完全不在意对方的遭遇。", dimension: "F", type: "F" },
+             { id: 16, text: "我从不为自己做出的选择感到愧疚或自责，哪怕我的行为伤害到了别人。", dimension: "F", type: "R" },
+             { id: 17, text: "我很清楚什么样的情绪表达能让别人喜欢我、信任我，哪怕那不是真实的我。", dimension: "F", type: "F" },
+             { id: 18, text: "我几乎不会向别人展露自己的脆弱，也不理解为什么别人会把情绪外露。", dimension: "F", type: "R" },
+             { id: 19, text: "我会通过营造“我最懂你”的氛围，来获得我想要的人际关系掌控权。", dimension: "F", type: "F" },
+             { id: 20, text: "面对突发状况时，我能完全剥离情绪，只站在利弊角度做出最理性的判断。", dimension: "F", type: "R" },
+             
+             // 执行逻辑 C/U
+             { id: 21, text: "我做任何事都喜欢制定详细的计划，确保所有事情都在我的掌控之中。", dimension: "C", type: "C" },
+             { id: 22, text: "我讨厌被规则束缚，享受打破既定秩序带来的快感。", dimension: "C", type: "U" },
+             { id: 23, text: "我无法接受事情脱离我的预期，一旦失控，我会变得非常焦虑易怒。", dimension: "C", type: "C" },
+             { id: 24, text: "我喜欢随心所欲地做事，讨厌被条条框框限制住自己的行为。", dimension: "C", type: "U" },
+             { id: 25, text: "我会用尽一切手段，把我在意的人和事牢牢抓在自己手里。", dimension: "C", type: "C" },
+             { id: 26, text: "我从不害怕挑战权威、打破规则，哪怕会因此受到惩罚。", dimension: "C", type: "U" },
+             { id: 27, text: "只有绝对的掌控感，才能让我感到真正的安全。", dimension: "C", type: "C" },
+             { id: 28, text: "我认为一成不变的规则毫无意义，只有自己开心才是最重要的。", dimension: "C", type: "U" },
+             { id: 29, text: "我会提前预判所有可能出现的风险，做好万全的应对准备，绝不允许意外发生。", dimension: "C", type: "C" },
+             { id: 30, text: "我享受放纵带来的刺激感，喜欢在无规则的边界里试探和冒险。", dimension: "C", type: "U" },
+             
+             // 外显型态 S/O
+             { id: 31, text: "我在人前永远是温和无害的样子，只有极少数人见过我真正的阴暗面。", dimension: "S", type: "S" },
+             { id: 32, text: "我的脾气从来都不藏着掖着，所有人都知道我的底线和原则。", dimension: "S", type: "O" },
+             { id: 33, text: "我擅长伪装自己，把真实的想法和欲望藏在心底，从不轻易外露。", dimension: "S", type: "S" },
+             { id: 34, text: "我不屑于伪装自己，哪怕我的想法不被主流接受，我也会直白地表达出来。", dimension: "S", type: "O" },
+             { id: 35, text: "我会把攻击性藏在暗处，在别人看不见的地方达成自己的目的。", dimension: "S", type: "S" },
+             { id: 36, text: "我有什么不满会直接说出来，从不搞背后算计的小动作。", dimension: "S", type: "O" },
+             { id: 37, text: "在人群中，我习惯做一个观察者，把自己的真实面目藏在人群里。", dimension: "S", type: "S" },
+             { id: 38, text: "我从来不在意别人怎么看我，只会按照自己的本能和心意活着。", dimension: "S", type: "O" },
+             { id: 39, text: "我只会在绝对安全、无人察觉的情况下，展露自己的阴影面。", dimension: "S", type: "S" },
+             { id: 40, text: "我的行为和内心永远保持一致，不屑于用“人设”来伪装自己。", dimension: "S", type: "O" },
+         ];
+         // 2. 100%匹配文档的16种类型完整解读
+         const types = {
+             "VFCS": {
+                 code: "V-F-C-S",
+                 name: "御伪控隐型",
+                 nickname: "权谋家",
+                 desc: "人前温和无害，人后算无遗策的蛰伏者，藏在人群里的顶级权谋家，永远不打无准备的仗。",
+root: "曾经的背叛与伤害让你明白，只有藏在暗处、牢牢掌控局面，才能不再受伤。你用温和面具伪装自己，用共情话术拿捏人心，所有谋划的本质，都是自我保护。",
+                 trait: "极强的情绪洞察力，却永远把真实想法藏得严严实实；做事提前做好万全计划，确保一切尽在掌控；从不主动挑事，但若被冒犯，会在暗处布好局，完成毫无痕迹的精准复仇。",
+                 advantage: "顶级的谋划能力与共情力，心思缜密步步为营，能在复杂人际关系中如鱼得水，是天生的领导者与布局者。",
+                 risk: "过度伪装与掌控欲会让你陷入内耗，很难真正信任他人，也很难感受到亲密关系的温暖；对复仇的执念，会让你困在过去的伤害里无法向前。",
+                 suggest: "看见你的铠甲，也看见铠甲下那个害怕受伤的自己。你的伪装与掌控都没有错，但不必让过去的伤害定义你所有的行为。试着在绝对安全的关系里展露真实的自己，整合阴影不是丢掉铠甲，而是学会什么时候穿上它，什么时候放下它。"
+             },
+             "VFCO": {
+                 code: "V-F-C-O",
+name: "御伪控露型",
+                 nickname: "裁决者",
+                 desc: "外热内冷的裁决者，温柔是你的名片，强硬是你的底线，所有人都知道你的善意，也都不敢轻易触碰你的逆鳞。",
+                 root: "你曾因心软和无底线的善意被伤害，于是学会了用共情和温柔搭建人际关系，同时用直白的锋芒划定自己的边界。你的所有强硬，都是为了守护自己在意的人和事。",
+                 trait: "擅长用共情拉近距离，能快速获得他人的信任；做事有规划、有掌控力，对自己在意的人会倾尽所有保护；你的底线和脾气从不藏着掖着，一旦有人越界，会立刻毫不留情地反击。",
+                 advantage: "刚柔并济，既有温暖人心的能力，也有保护自己的底气，能成为团队里的核心人物，也能成为亲友最可靠的依靠。",
+                 risk: "容易因过度守护而陷入偏执，对越界行为的反应过于激烈；会把他人的事扛在自己身上，最终让自己身心俱疲。",
+                 suggest: "你的守护是珍贵的品质，但不必把所有人的人生都扛在自己肩上。区分“我的事”和“别人的事”，你的锋芒应该用来保护自己，而不是为别人的人生兜底。"
+             },
+             "VFUS": {
+                 code: "V-F-U-S",
+                 name: "御伪乱隐型",
+                 nickname: "复仇者",
+                 desc: "游走在规则边缘的复仇者，你是最懂人心的猎手，用最温柔的伪装，完成最彻底的复仇。",
+                 root: "你曾被规则和权威伤害，明白循规蹈矩无法保护自己，于是学会了在规则的缝隙里游走，用伪装隐藏自己的恨意，在无人察觉的地方，让伤害你的人付出代价。",
+                 trait: "能精准拿捏他人的情绪弱点，用完美的伪装隐藏自己的真实目的；讨厌被规则束缚，擅长打破常规找到破局点；从不把恨意挂在脸上，只会在暗处一步步布局，完成自己的复仇。",
+                 advantage: "极强的应变能力与反常规思维，能在绝境中找到破局之路，共情力让你能轻易看透人心，永远不会被表面的善意蒙蔽。",
+                 risk: "对复仇的执念会让你陷入深渊，长期的伪装会让你迷失真实的自己；对规则的漠视，可能会让你在不经意间越过边界，付出不必要的代价。",
+                 suggest: "看见你的恨意，也看见恨意背后那个渴望被公平对待的自己。复仇可以抚平一时的委屈，但无法治愈真正的创伤。放下对伤害的执念，不是原谅伤害你的人，而是放过被困在过去的自己。"
+             },
+             "VFUO": {
+                 code: "V-F-U-O",
+                 name: "御伪乱露型",
+                 nickname: "执剑者",
+                 desc: "爱憎分明的江湖侠客，温柔时能暖透人心，狠起来能撕破一切虚伪，你的好恶全写在脸上，你的剑永远指向伤害你的人。",
+                 root: "你曾因虚伪的规则和人情世故被伤害，于是拒绝被世俗规训束缚，选择直白地展露自己的锋芒与爱恨，用自己的方式，为自己讨回公道。",
+                 trait: "共情力强，能轻易理解他人的苦难，对弱者有天然的保护欲；讨厌虚伪的规则和双标的人，会毫不留情地撕破一切假象；有怨报怨、有仇报仇，从不搞背后算计，所有的反击都光明正大。",
+                 advantage: "真实坦荡，既有柔软的同理心，也有直面不公的勇气，能吸引到同频的、真诚的人，是圈子里最有号召力的人。",
+                 risk: "过于直白的锋芒容易树敌，容易被情绪冲昏头脑，做出冲动的决定；对规则的漠视，可能会让你陷入不必要的麻烦。",
+                 suggest: "你的坦荡与勇气是非常珍贵的品质，但锋芒不必时时外露。学会收放自己的攻击性，不是变得虚伪，而是让你的剑，只在真正值得的时候出鞘。"
+             },
+             "VRCS": {
+                 code: "V-R-C-S",
+                 name: "御冷控隐型",
+                 nickname: "局外人",
+                 desc: "藏在高墙之后的者，你用绝对的理性和极致的掌控，为自己搭建了一座坚不可摧的城池，不允许任何人轻易闯入，也绝不允许任何人伤害你分毫。",
+                 root: "你曾因情绪外露和信任他人被深深伤害，于是学会了彻底剥离情绪，用绝对的理性和掌控感保护自己。你的冷漠不是天生的，而是你为自己打造的最坚固的城墙。",
+                 trait: "情绪极度稳定，永远保持绝对的理性，很难被他人影响；做事严谨周密，提前预判所有风险，确保一切都在自己的掌控之中；把真实的自己藏得很深，几乎不会向任何人展露脆弱，也绝不允许任何人突破你的边界。",
+                 advantage: "顶级的理性思维与风险管控能力，能在极端混乱的局面中保持冷静，做出最正确的决策，是天生的风险把控者与战略家。",
+                 risk: "过度的封闭会让你陷入孤独，彻底的情绪剥离会让你失去感受快乐的能力；极致的掌控欲会让你在事情失控时，陷入严重的焦虑与自我怀疑。",
+                 suggest: "你的城墙保护了你，也困住了你。整合你的阴影，不是拆掉你的城墙，而是在城墙上开一扇门，允许值得的人偶尔进来看看。试着接纳自己的情绪，哪怕是脆弱和不安，它们也是你完整人格的一部分。"
+             },
+             "VRCO": {
+                 code: "V-R-C-O",
+                 name: "御冷控露型",
+                 nickname: "守护者",
+                 desc: "面冷心硬的边界守护者，你用绝对的理性和直白的锋芒，划定了自己的世界，不主动伤害任何人，但也绝不允许任何人越界伤害你和你在意的人。",
+                 root: "你曾因心软和退让被不断侵犯边界，于是学会了用冷漠和强硬武装自己，直白地告诉所有人你的底线，用绝对的掌控力，守护自己和在意的人。",
+                 trait: "情绪极度稳定，永远站在利弊角度思考问题，不被情感裹挟；做事有规划、有原则，底线清晰，所有人都知道什么事绝对不能做；对自己在意的人会默默做好所有保护，一旦有人越界，会立刻给出毫不留情的反击。",
+                 advantage: "极强的责任感与保护欲，冷静可靠，能在关键时刻扛住所有压力，是亲友最信任的靠山，也是团队里最稳的核心。",
+                 risk: "过于冷峻的外表会让别人不敢靠近，很难建立深度的亲密关系；容易因过度保护而变得偏执，把自己的意愿强加给在意的人。",
+                 suggest: "你的可靠是珍贵的，但不必永远做那个无坚不摧的人。偶尔展露自己的柔软，不会削弱你的力量，反而会让你和世界的连接，变得更加温暖。"
+},
+             "VRUS": {
+                 code: "V-R-U-S",
+                 name: "御冷乱隐型",
+                 nickname: "潜伏者",
+                 desc: "游走在深渊边缘的伏猎者，你漠视规则，剥离情绪，把自己藏在阴影里，独来独往，不被任何人理解，也不需要任何人的理解。",
+",
+                 root: "你曾被世界的规则和人情世故深深伤害，对世俗的一切都感到失望，于是选择彻底脱离主流的规训，用冷漠和疏离保护自己，在无人看见的地方，用自己的方式对抗世界。",
+                 trait: "情感极度淡漠，几乎不会被任何人、任何事影响；讨厌所有规则和束缚，只按照自己的心意活着；把自己藏得很深，从不向外界展露自己的真实想法，独来独往，不依赖任何人。",
+                 advantage: "极致的独立与自由，不被世俗的眼光和规则绑架，能看透一切虚伪的表象，永远忠于自己，活成了大多数人不敢活的样子。",
+                 risk: "过度的疏离会让你彻底与世界隔绝，陷入无意义的虚无之中；对规则的漠视，可能会让你在不经意间陷入危险的境地。",
+                 suggest: "你的独来独往，是对世界的反抗，也是对自己的保护。但不必把自己困在深渊里，与世界和解，不是向你讨厌的规则妥协，而是给自己一个看见光明的机会。"
+             "VRUO": {
+                 code: "V-R-U-O",
+                 name: "御冷乱露型",
+                 nickname: "破局者",
+                 desc: "直面一切不公的破局者，你漠视规则，不惧权威，情绪稳定，锋芒毕露，永远站在世俗规训的对立面，用自己的方式，对抗所有的不公与伤害。",
+                 root: "你曾因循规蹈矩被伤害，被权威和规则压迫，于是彻底拒绝被世俗束缚，选择直白地展露自己的锋芒，用无畏的反抗，为自己和弱者讨回公道。",
+                 trait: "情感淡漠，不被情绪裹挟，也不在意别人的眼光；讨厌虚伪的规则和权威，会毫不留情地挑战和打破它们；所有的不满和反抗都摆在明面上，从不畏惧后果，永远忠于自己的原则。",
+                 advantage: "极致的勇气与反叛精神，不被世俗绑架，敢于直面不公，能打破常规，创造出全新的可能，是能推动改变的先行者。",
+                 risk: "过于激进的反抗容易树敌，给自己带来不必要的麻烦；对规则的彻底漠视，可能会让你失去对风险的判断，陷入危险之中。",
+                 suggest: "你的无畏是非常珍贵的力量，但反抗不是目的，保护自己、成为更好的自己才是。学会有选择地打破规则，而不是为了反抗而反抗，让你的力量，用在真正值得的地方。"
+             },
+             "GFCS": {
+                 code: "G-F-C-S",
+                 name: "夺伪控隐型",
+                 nickname: "野心家",
+                 desc: "藏在幕后的顶级野心家，你用温和的面具伪装自己的野心，用共情的话术操控人心，用周密的计划掌控全局，在无人察觉的情况下，一步步拿到自己想要的一切。",
+                 root: "你看透了世界的底层规则，明白只有掌握资源和权力，才能拥有真正的话语权。你拒绝被“无欲无求”的道德枷锁束缚，坦然承认自己的野心，把所有的锋芒和欲望，都藏在了温和的面具之下。",
+                 trait: "顶级的情绪洞察力和操控能力，能轻易获得他人的信任和拥护；做事周密严谨，步步为营，提前布好全局，确保所有事情都朝着自己想要的方向发展；野心极大，但从不外露，永远在暗处布局，悄无声息地登顶。",
+                 advantage: "天生的领导者与战略家，拥有顶级的情商和谋划能力，能团结一切可以团结的力量，在复杂的局面中稳操胜券，成就一番事业。",
+                 risk: "长期的伪装会让你迷失真实的自己，很难建立真正的亲密关系；过度的野心和操控欲，会让你为了达成目的不择手段，最终失去底线。",
+                 suggest: "你的野心和能力，是你与生俱来的天赋。整合你的阴影，不是压抑自己的欲望，而是学会在追逐目标的同时，守住自己的底线。你的能力可以用来成就自己，也可以用来照亮别人，这两者并不矛盾。"
+             },
+             "GFCO": {
+                 code: "G-F-C-O",
+                 name: "夺伪控露型",
+                 nickname: "掌权者",
+                 desc: "气场全开的掌权者，你用共情的能力凝聚人心，用强势的手段掌控局面，你的野心写在脸上，你的能力配得上你的欲望，是天生的领袖。",
+                 root: "你看透了人际交往的本质，明白只有站在顶端，才能拥有真正的选择权。你坦然承认自己的野心，不屑于隐藏自己的欲望，用自己的能力和魅力，一步步拿到自己想要的权力和资源。",
+                 trait: "情商极高，能精准拿捏人心，快速获得他人的拥护；做事有规划、有魄力，掌控欲极强，能牢牢掌控全局；野心和锋芒都直白外露，从不避讳自己的目标，敢想敢做，杀伐果断。",
+                 advantage: "天生的领袖人物，拥有极强的个人魅力和领导力，能带领团队突破困境，达成目标，在任何领域都能成为核心掌权者。",
+                 risk: "过于强势的掌控欲，容易让你变得独断专行，听不进别人的意见；过于直白的野心，容易树敌，被人抓住把柄。",
+                 suggest: "你的领导力和个人魅力，是你最珍贵的财富。学会倾听不同的声音，不会削弱你的权威，反而会让你的根基更加稳固。真正的掌权者，不是掌控所有人，而是让所有人都心甘情愿地与你同行。"
+             },
+             "GFUS": {
+                 code: "G-F-U-S",
+                 name: "夺伪乱隐型",
+                 nickname: "狩猎者",
+                 desc: "藏在人群里的顶级狩猎者，你用完美的伪装隐藏自己的狩猎意图，用共情的能力锁定猎物，在规则的缝隙里游走，在最恰当的时机，精准出击，拿下自己想要的一切。",
+                 root: "你看透了规则的虚伪，明白循规蹈矩永远无法拿到自己想要的核心利益。你坦然承认自己的欲望，拒绝被世俗的规则束缚，用伪装和灵活的手段，为自己争取最大的利益。",
+                 trait: "极强的共情力和伪装能力，能完美融入任何环境，让所有人都对你放下防备；思维灵活，不被规则束缚，擅长打破常规找到破局点；野心藏得很深，从不轻易暴露自己的真实目的，只会在最恰当的时机，精准出击。",
+                 advantage: "顶级的应变能力和机会捕捉能力，能在任何环境中找到机会，快速拿到自己想要的结果，是天生的机会主义者和狩猎者。",
+                 risk: "长期的伪装和算计，会让你很难信任任何人，也很难感受到真诚的情感；对规则的漠视，可能会让你在追逐利益的过程中，越过底线，付出惨痛的代价。",
+                 suggest: "你的灵活和敏锐，是你在这个世界上生存的利器。但追逐利益不是人生的全部，偶尔放下算计，感受真诚的情感，会让你的人生，变得更加丰盈。"
+             },
+             "GFUO": {
+                 code: "G-F-U-O",
+                 name: "夺伪乱露型",
+                 nickname: "征服者",
+desc: "魅力四射的征服者，你用极致的个人魅力吸引众人，用打破常规的手段征服一切，你的野心和锋芒都直白外露，永远在追逐更高的山峰，更广阔的世界。",
+                 root: "你天生就带着强烈的征服欲，拒绝被平庸的生活和刻板的规则束缚。你坦然承认自己的野心和欲望，不屑于隐藏自己的锋芒，用自己的方式，征服所有自己想要的东西。",
+                 trait: "个人魅力极强，情商极高，能轻易吸引到所有人的目光；思维跳脱，不被规则束缚，擅长用出其不意的手段达成目标；野心和欲望都直白外露，敢想敢干，享受征服带来的快感，永远不满足于现状。",
+                 advantage: "天生的开拓者与冒险家，拥有极强的个人魅力和创造力，能打破常规，创造出全新的可能，在任何领域都能闯出属于自己的一片天。",
+                 risk: "过于追求征服的快感，容易变得急功近利，为了达成目标不择手段；过于张扬的个性，容易树敌，给自己带来不必要的麻烦。",
+                 suggest: "你的征服欲和创造力，是你与生俱来的天赋。但真正的征服，不是征服外界的一切，而是征服自己内心的欲望。学会在追逐目标的同时，享受当下的风景，你的人生会更加精彩。"
+             },
+             "GRCS": {
+                 code: "G-R-C-S",
+                 name: "夺冷控隐型",
+                 nickname: "布局者",
+                 desc: "不动声色的顶级布局者，你用绝对的理性剥离所有情绪，用极致的周密布好全局，在无人察觉的情况下，一步步完成自己的战略目标，是真正的幕后棋手。",
+                 root: "你看透了世界的底层逻辑，明白情绪是成事的最大累赘，只有绝对的理性和周密的布局，才能拿到自己想要的结果。你坦然承认自己的野心，把所有的欲望和锋芒，都藏在了冷静的外表之下。",
+                 trait: "绝对的理性，情绪极度稳定，永远不会被情感和偏见影响；做事极其周密，能提前预判所有可能的风险，布好全局的每一步；野心极大，但从不外露，永远在暗处冷静观察，悄无声息地完成自己的布局。",
+                 advantage: "顶级的战略家和投资家，拥有极致的理性和长远的眼光，能在复杂的局面中找到最优解，稳操胜券，成就一番大事业。",
+                 risk: "过度的理性会让你变得冷漠无情，为了利益不择手段，失去人性的温度；长期的封闭会让你陷入孤独，很难感受到人生的快乐和意义。",
+                 suggest: "你的理性和眼光，是你最强大的武器。但人生不是一场只有输赢的棋局，偶尔放下利弊的算计，感受情感的温度，会让你的人生，变得更加完整。"
+             },
+             "GRCO": {
+                 code: "G-R-C-O",
+                 name: "夺冷控露型",
+                 nickname: "统治者",
+                 desc: "杀伐果断的铁腕统治者，你用绝对的理性掌控全局，用强硬的手段扫清障碍，你的野心写在脸上，你的原则不容置疑，是天生的王者。",
+                 root: "你明白只有站在权力的顶端，才能制定规则，拥有真正的绝对自由。你坦然承认自己的野心，不屑于隐藏自己的锋芒，用绝对的理性和铁腕的手段，一步步建立属于自己的秩序。",
+                 trait: "绝对的理性，情绪极度稳定，不被任何情感裹挟；做事杀伐果断，掌控欲极强，能牢牢掌控全局，绝不允许任何意外发生；野心和原则都直白外露，敢想敢干，绝不拖泥带水，为了达成目标，不惜一切代价。",
+                 advantage: "天生的王者与统治者，拥有极强的决断力和领导力，能在混乱的局面中建立秩序，带领团队走向巅峰，是能成就伟业的人物。",
+                 risk: "过于铁腕的手段，会让你变得冷酷无情，失去人心；过度的掌控欲，会让你变得独断专行，听不进任何反对的声音，最终陷入孤立无援的境地。",
+                 suggest: "你的决断力和领导力，是你成就伟业的基石。但真正的王者，不是靠铁腕征服所有人，而是靠格局容纳所有人。学会柔软，不是变得软弱，而是让你的统治，变得更加稳固，更加有温度。"
+             },
+             "GRUS": {
+                 code: "G-R-U-S",
+                 name: "夺冷乱隐型",
+                 nickname: "掠食者",
+                 desc: "潜伏在暗处的掠食者，你漠视规则，剥离情绪，像孤狼一样潜伏在阴影里，耐心等待最佳的出击时机，一旦出手，必定精准拿下自己的猎物。",
+                 root: "你看透了规则的本质是强者制定的游戏，不屑于被世俗的规则束缚。你坦然承认自己的欲望，像掠食者一样，只关注最终的结果，用最隐蔽、最有效的方式，拿到自己想要的一切。",
+                 trait: "情感极度淡漠，几乎没有任何情绪波动，永远只关注利弊；讨厌所有规则和束缚，只遵循自己的掠食法则；擅长隐藏自己，耐心极强，能在暗处潜伏很久，只为等待最佳的出击时机，一旦出手，必定一击即中。",
+                 advantage: "极致的耐心和执行力，顶级的风险预判能力，能在混乱的局面中找到最佳的机会，用最小的成本，拿到最大的收益，是天生的掠食者和投机者。",
+                 risk: "过度的冷漠和自私，会让你彻底与世界隔绝，陷入无尽的孤独之中；对规则的漠视和对利益的极致追求，会让你越过底线，最终付出惨痛的代价。",
+                 suggest: "你的耐心和执行力，是你生存的最强武器。但人生不是一场只有捕猎的荒野求生，除了利益，还有很多值得你去感受的东西。试着打开自己的心扉，你会发现，世界除了黑暗的阴影，还有光明的温暖。"
+             },
+             "GRUO": {
+                 code: "G-R-U-O",
+                 name: "夺冷乱露型",
+                 nickname: "破坏者",
+                 desc: "打破一切的狂放破坏者，你漠视规则，不惧权威，剥离情绪，锋芒毕露，你不屑于遵守现有的游戏规则，只想打破一切，建立属于自己的全新秩序。",
+                 root: "你看透了现有规则的虚伪和腐朽，拒绝被平庸的世俗束缚。你坦然承认自己的野心和欲望，不屑于隐藏自己的锋芒，用无畏的破坏，打破所有的枷锁，为自己争取绝对的自由。",
+                 trait: "绝对的理性，情绪极度稳定，不被任何情感和外界的眼光影响；彻底漠视规则和权威，享受打破秩序带来的快感；所有的锋芒和欲望都直白外露，无所畏惧，为了达成自己的目标，不惜打破一切既定的规则。",
+                 advantage: "极致的反叛精神和创造力，能打破一切陈旧的束缚，创造出全新的可能，是能颠覆行业、改变规则的革命者。",
+                 risk: "过于激进的破坏欲，会让你变得不计后果，给自己带来毁灭性的打击；对规则的彻底漠视，会让你失去底线，最终被世界反噬。",
+                 suggest: "你的反叛精神和创造力，是改变世界的源动力。但真正的革命，不是打破一切，而是在废墟之上，建立起更好的秩序。学会有选择地破坏，有目的地创造，你的力量，才能真正改变世界。"
+             }
+};
+         // 全局变量
+         let currentQuestion = 0;
+         const answers = {};
+         let dimensionScores = {};
+         // DOM元素
+         const homePage = document.getElementById('home-page');
+         const testPage = document.getElementById('test-page');
+         const resultPage = document.getElementById('result-page');
+         const questionContainer = document.getElementById('question-container');
+         const progressText = document.getElementById('progress-text');
+         const progressBar = document.getElementById('progress-bar');
+         const prevBtn = document.getElementById('prev-question');
+         const nextBtn = document.getElementById('next-question');
+         const submitBtn = document.getElementById('submit-test');
+         const startBtn = document.getElementById('start-test');
+         const restartBtn = document.getElementById('restart-test');
+         const copyBtn = document.getElementById('copy-result');
+         // 渲染题目
+         function renderQuestion(index) {
+             const q = questions[index];
+             questionContainer.innerHTML = `
+                 <div class="mb-6">
+                     <p class="text-xl font-medium text-white mb-6">${q.id}. ${q.text}</p>
+                     <div class="space-y-3">
+                         ${[1,2,3,4,5].map(score => `
+                             <label class="flex items-center border border-graytext rounded-lg p-4 cursor-pointer option-hover ${answers[q.id] == score ? 'bg-primary/20 border-primary' : ''}">
+                                 <input type="radio" name="question-${q.id}" value="${score}" class="hidden" ${answers[q.id] == score ? 'checked' : ''}>
+                                 <span class="w-6 h-6 flex items-center justify-center rounded-full border border-graytext mr-3 font-bold ${answers[q.id] == score ? 'bg-primary border-primary text-white' : ''}">${score}</span>
+                                 <span class="text-graytext">${score == 1 ? '完全不符合' : score == 2 ? '不太符合' : score == 3 ? '中立/不确定' : score == 4 ? '比较符合' : '完全符合'}</span>
+                             </label>
+                         `).join('')}
+                     </div>
+                 </div>
+             `;
+             // 绑定单选事件
+             document.querySelectorAll(`input[name="question-${q.id}"]`).forEach(radio => {
+                 radio.addEventListener('change', (e) => {
+                     answers[q.id] = parseInt(e.target.value);
+                     // 更新选中样式
+                     document.querySelectorAll(`label[for="question-${q.id}"]`).forEach(label => {
+                         label.classList.remove('bg-primary/20', 'border-primary');
+                     });
+                     e.target.closest('label').classList.add('bg-primary/20', 'border-primary');
+                 });
+             });
+             // 更新进度
+             progressText.textContent = `${index + 1}/40`;
+             progressBar.style.width = `${((index + 1) / 40) * 100}%`;
+             // 按钮显示控制
+             prevBtn.classList.toggle('hidden', index === 0);
+             if (index === questions.length - 1) {
+                 nextBtn.classList.add('hidden');
+                 submitBtn.classList.remove('hidden');
+             } else {
+                 nextBtn.classList.remove('hidden');
+                 submitBtn.classList.add('hidden');
+             }
+         }
+         // 计分逻辑（严格匹配文档）
+         function calculateScore() {
+             let V = 0, G = 0, F = 0, R = 0, C = 0, U = 0, S = 0, O = 0;
+             questions.forEach(q => {
+                 const score = answers[q.id] || 0;
+                 if (q.dimension === 'V') {
+                     q.type === 'V' ? V += score : G += score;
+                 } else if (q.dimension === 'F') {
+                     q.type === 'F' ? F += score : R += score;
+                 } else if (q.dimension === 'C') {
+                     q.type === 'C' ? C += score : U += score;
+                 } else if (q.dimension === 'S') {
+                     q.type === 'S' ? S += score : O += score;
+                 }
+             });
+             dimensionScores = { V, G, F, R, C, U, S, O };
+             // 确定类型字母（严格匹配文档计分规则）
+             const type1 = V > G ? 'V' : 'G';
+             const type2 = F > R ? 'F' : 'R';
+             const type3 = C > U ? 'C' : 'U';
+             const type4 = S > O ? 'S' : 'O';
+             const fullType = type1 + type2 + type3 + type4;
+             return types[fullType];
+         }
+         // 渲染结果
+         function renderResult(result) {
+             document.getElementById('result-type').textContent = result.code;
+             document.getElementById('result-name').textContent = `—— ${result.nickname}`;
+             document.getElementById('result-desc').textContent = result.desc;
+             document.getElementById('result-root').textContent = result.root;
+             document.getElementById('result-trait').textContent = result.trait;
+document.getElementById('result-advantage').textContent = result.advantage;
+             document.getElementById('result-risk').textContent = result.risk;
+             document.getElementById('result-suggest').textContent = result.suggest;
+             // 渲染维度详情
+             document.getElementById('dimension-detail').innerHTML = `
+                 <div class="grid grid-cols-2 gap-4">
+                     <div>
+                         <p class="font-medium text-white mb-1">动机维度</p>
+                         <p class="text-graytext">防御复仇(V): ${dimensionScores.V}分 | 掠夺攫取(G): ${dimensionScores.G}分</p>
+                     </div>
+                     <div>
+                         <p class="font-medium text-white mb-1">情绪维度</p>
+                         <p class="text-graytext">伪共情操控(F): ${dimensionScores.F}分 | 冷理性剥离(R): ${dimensionScores.R}分</p>
+                     </div>
+                     <div>
+                         <p class="font-medium text-white mb-1">执行逻辑</p>
+                         <p class="text-graytext">偏执掌控(C): ${dimensionScores.C}分 | 无序放任(U): ${dimensionScores.U}分</p>
+                     </div>
+                     <div>
+                         <p class="font-medium text-white mb-1">外显型态</p>
+                         <p class="text-graytext">隐秘蛰伏(S): ${dimensionScores.S}分 | 外放本能(O): ${dimensionScores.O}分</p>
+                     </div>
+                 </div>
+             `;
+         }
+         // 事件绑定
+         // 开始测试
+         startBtn.addEventListener('click', () => {
+             homePage.classList.add('hidden');
+             testPage.classList.remove('hidden');
+             renderQuestion(currentQuestion);
+         });
+         // 上一题
+         prevBtn.addEventListener('click', () => {
+             if (currentQuestion > 0) {
+                 currentQuestion--;
+                 renderQuestion(currentQuestion);
+             }
+         });
+         // 下一题
+         nextBtn.addEventListener('click', () => {
+             if (!answers[questions[currentQuestion].id]) {
+                 alert('请选择一个选项后再继续');
+                 return;
+             }
+             if (currentQuestion < questions.length - 1) {
+                 currentQuestion++;
+                 renderQuestion(currentQuestion);
+             }
+         });
+         // 提交测试
+         submitBtn.addEventListener('click', () => {
+             if (!answers[questions[currentQuestion].id]) {
+                 alert('请选择一个选项后再提交');
+                 return;
+             }
+             const result = calculateScore();
+             renderResult(result);
+             testPage.classList.add('hidden');
+             resultPage.classList.remove('hidden');
+             window.scrollTo(0, 0);
+         });
+         // 重新测试
+         restartBtn.addEventListener('click', () => {
+             if (confirm('确定要重新测试吗？已答题目将被清空')) {
+                 currentQuestion = 0;
+                 for (const key in answers) delete answers[key];
+                 dimensionScores = {};
+                 resultPage.classList.add('hidden');
+                 homePage.classList.remove('hidden');
+                 window.scrollTo(0, 0);
+             }
+         });
+         // 复制结果
+         copyBtn.addEventListener('click', () => {
+             const resultType = document.getElementById('result-type').textContent;
+             const resultName = document.getElementById('result-name').textContent;
+             const resultDesc = document.getElementById('result-desc').textContent;
+             const resultRoot = document.getElementById('result-root').textContent;
+             const resultTrait = document.getElementById('result-trait').textContent;
+             const resultAdvantage = document.getElementById('result-advantage').textContent;
+             const resultRisk = document.getElementById('result-risk').textContent;
+             const resultSuggest = document.getElementById('result-suggest').textContent;
+             const copyText = `
+ 【SSTI阴影自我测试结果】
+ 我的类型：${resultType} ${resultName}
+ 核心人设：${resultDesc}
+ 阴影根源：${resultRoot}
+ 核心特质：${resultTrait}
+ 潜在优势：${resultAdvantage}
+ 阴影风险：${resultRisk}
+ 给你的建议：${resultSuggest}
+             `.trim();
+             navigator.clipboard.writeText(copyText).then(() => {
+                 alert('测试结果已复制到剪贴板！');
+             }).catch(() => {
+                 // 降级兼容方案
+                 const textArea = document.createElement('textarea');
+                 textArea.value = copyText;
+                 document.body.appendChild(textArea);
+                 textArea.select();
+                 document.execCommand('copy');
+                 document.body.removeChild(textArea);
+                 alert('测试结果已复制到剪贴板！');
+             });
+         });
+     </script>
+ </body>
+ </html>
