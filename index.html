@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SSTI阴影自我测试</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#0f172a] text-white min-h-screen font-sans">
+<div class="max-w-3xl mx-auto px-4 py-10">
+
+  <!-- 首页 -->
+  <div id="home">
+    <div class="text-center mb-12">
+      <h1 class="text-4xl font-bold text-indigo-400 mb-2">SSTI阴影自我测试</h1>
+      <p class="text-gray-300 mb-1">Shadow Self Type Indicator · 完整版</p>
+      <p class="text-gray-400">看见你潜意识里的阴影自我</p>
+    </div>
+
+    <div class="bg-[#1e293b] rounded-2xl p-6 mb-8">
+      <h2 class="text-xl font-bold mb-3">测试官方定位</h2>
+      <p class="text-gray-300 leading-relaxed">
+        本测试以荣格原型心理学核心的阴影自我理论为底层奠基，结合人格心理学领域主流认可的黑暗三联征、黑暗四联体理论体系，严格遵循经典测验理论（CTT）的标准化测量规范，对标MBTI的四维度二分法16型分型逻辑，是为大众打造的「内在阴影自我探索工具」，无好坏对错之分，非临床心理诊断依据。
+      </p>
+    </div>
+
+    <div class="bg-[#1e293b] rounded-2xl p-6 mb-10">
+      <h2 class="text-xl font-bold mb-3">答题规则</h2>
+      <p class="mb-3">请仔细阅读每一道题目，根据你真实的想法与行为习惯作答，而非社会期待的“正确答案”。</p>
+      <div class="grid grid-cols-5 gap-2 text-center mb-4">
+        <div><div class="font-bold">1</div><div class="text-sm text-gray-400">完全不符合</div></div>
+        <div><div class="font-bold">2</div><div class="text-sm text-gray-400">不太符合</div></div>
+        <div><div class="font-bold">3</div><div class="text-sm text-gray-400">中立/不确定</div></div>
+        <div><div class="font-bold">4</div><div class="text-sm text-gray-400">比较符合</div></div>
+        <div><div class="font-bold">5</div><div class="text-sm text-gray-400">完全符合</div></div>
+      </div>
+      <p class="text-red-400 text-sm">本测试共40道单选题，预计完成时间5-8分钟</p>
+    </div>
+
+    <div class="text-center">
+      <button onclick="startTest()" class="bg-indigo-500 hover:bg-indigo-600 px-8 py-3 rounded-full text-white font-bold">
+        开始测试
+      </button>
+    </div>
+  </div>
+
+  <!-- 测试页面 -->
+  <div id="test" style="display:none;">
+    <div class="mb-6">
+      <div class="flex justify-between mb-2">
+        <p>第 <span id="current">1</span> 题 / 共40题</p>
+      </div>
+      <div class="w-full bg-gray-700 h-2 rounded">
+        <div id="bar" class="bg-indigo-500 h-2 rounded w-[2.5%]"></div>
+      </div>
+    </div>
+
+    <div class="bg-[#1e293b] rounded-2xl p-6 mb-6">
+      <p id="question" class="text-lg mb-4"></p>
+      <div class="space-y-3">
+        <label class="block p-3 border border-gray-600 rounded cursor-pointer hover:bg-indigo-900/30">
+          <input name="ans" type="radio" value="1" class="mr-2"> 1 完全不符合
+        </label>
+        <label class="block p-3 border border-gray-600 rounded cursor-pointer hover:bg-indigo-900/30">
+          <input name="ans" type="radio" value="2" class="mr-2"> 2 不太符合
+        </label>
+        <label class="block p-3 border border-gray-600 rounded cursor-pointer hover:bg-indigo-900/30">
+          <input name="ans" type="radio" value="3" class="mr-2"> 3 中立/不确定
+        </label>
+        <label class="block p-3 border border-gray-600 rounded cursor-pointer hover:bg-indigo-900/30">
+          <input name="ans" type="radio" value="4" class="mr-2"> 4 比较符合
+        </label>
+        <label class="block p-3 border border-gray-600 rounded cursor-pointer hover:bg-indigo-900/30">
+          <input name="ans" type="radio" value="5" class="mr-2"> 5 完全符合
+        </label>
+      </div>
+    </div>
+
+    <div class="flex justify-between">
+      <button onclick="prev()" class="border border-gray-500 px-4 py-2 rounded">上一题</button>
+      <button onclick="next()" class="bg-indigo-500 px-5 py-2 rounded text-white font-bold">下一题</button>
+    </div>
+  </div>
+
+  <!-- 结果页面 -->
+  <div id="result" style="display:none;" class="space-y-6 mt-10">
+    <h2 class="text-2xl font-bold text-center text-indigo-400">测试完成！</h2>
+    <div class="bg-[#1e293b] p-6 rounded-2xl">
+      <p id="resultText"></p>
+    </div>
+    <button onclick="location.reload()" class="bg-indigo-500 px-6 py-3 rounded-full text-white font-bold w-full">重新测试</button>
+  </div>
+</div>
+
+<script>
+const questions = [
+  "只有当别人先冒犯、伤害我之后，我才会对其展开反击。",
+  "为了拿到我想要的利益，我可以不择手段达到目的，哪怕会损害他人的利益。",
+  "我所有的“黑化”行为，本质上都是为了自保，而非主动攻击他人。",
+  "我从不避讳自己的野心，会主动争取所有能让我向上走的机会，哪怕需要踩着别人的肩膀。",
+  "别人对我的伤害，我一定会记在心里，找机会加倍奉还。",
+  "我认为人际交往的本质是价值交换，能为我带来利益的关系，才值得我投入精力。",
+  "我不会主动挑事，但如果有人惹到我，我绝对不会忍气吞声。",
+  "面对竞争时，我会优先考虑如何赢，而非会不会伤害到竞争对手。",
+  "我很难放下曾经被背叛、被伤害的经历，复仇的念头会一直萦绕在我心里。",
+  "我认为弱肉强食是世界的底层规则，强者掠夺资源是天经地义的事情。",
+  "我能很轻易地看穿别人的情绪弱点，并利用这些弱点让对方听我的话。",
+  "我很难对别人的痛苦感同身受，哪怕是亲近的人，也很难让我产生情绪波动。",
+  "我擅长用温柔、共情的话术拉近和别人的距离，让对方对我放下防备。",
+  "我认为情绪是成事的累赘，理性永远应该凌驾于情感之上。",
+  "我可以一边在表面上安慰别人，一边在心里完全不在意对方的遭遇。",
+  "我从不为自己做出的选择感到愧疚或自责，哪怕我的行为伤害到了别人。",
+  "我很清楚什么样的情绪表达能让别人喜欢我、信任我，哪怕那不是真实的我。",
+  "我几乎不会向别人展露自己的脆弱，也不理解为什么别人会把情绪外露。",
+  "我会通过营造“我最懂你”的氛围，来获得我想要的人际关系掌控权。",
+  "面对突发状况时，我能完全剥离情绪，只站在利弊角度做出最理性的判断。",
+  "我做任何事都喜欢制定详细的计划，确保所有事情都在我的掌控之中。",
+  "我讨厌被规则束缚，享受打破既定秩序带来的快感。",
+  "我无法接受事情脱离我的预期，一旦失控，我会变得非常焦虑易怒。",
+  "我喜欢随心所欲地做事，讨厌被条条框框限制住自己的行为。",
+  "我会用尽一切手段，把我在意的人和事牢牢抓在自己手里。",
+   "我从不害怕挑战权威、打破规则，哪怕会因此受到惩罚。",
+   "只有绝对的掌控感，才能让我感到真正的安全。",
+   "我认为一成不变的规则毫无意义，只有自己开心才是最重要的。",
+   "我会提前预判所有可能出现的风险，做好万全的应对准备，绝不允许意外发生。",
+   "我享受放纵带来的刺激感，喜欢在无规则的边界里试探和冒险。",
+   "我在人前永远是温和无害的样子，只有极少数人见过我真正的阴暗面。",
+   "我的脾气从来都不藏着掖着，所有人都知道我的底线和原则。",
+   "我擅长伪装自己，把真实的想法和欲望藏在心底，从不轻易外露。",
+   "我不屑于伪装自己，哪怕我的想法不被主流接受，我也会直白地表达出来。",
+   "我会把攻击性藏在暗处，在别人看不见的地方达成自己的目的。",
+   "我有什么不满会直接说出来，从不搞背后算计的小动作。",
+   "在人群中，我习惯做一个观察者，把自己的真实面目藏在人群里。",
+   "我从来不在意别人怎么看我，只会按照自己的本能和心意活着。",
+   "我只会在绝对安全、无人察觉的情况下，展露自己的阴影面。",
+   "我的行为和内心永远保持一致，不屑于用“人设”来伪装自己。"
+ ];
+ let current = 0;
+ let answers = [];
+ function startTest() {
+   document.getElementById("home").style.display = "none";
+   document.getElementById("test").style.display = "block";
+   showQuestion();
+ }
+ function showQuestion() {
+   document.getElementById("question").innerText = questions[current];
+   document.getElementById("current").innerText = current + 1;
+   document.getElementById("bar").style.width = (current + 1) / 40 * 100 + "%";
+   document.querySelectorAll('input[name="ans"]').forEach((r) => (r.checked = false));
+ }
+ function next() {
+   let sel = document.querySelector('input[name="ans"]:checked');
+   if (!sel) { alert("请选择一个选项"); return; }
+   answers[current] = sel.value;
+   current++;
+   if (current >= questions.length) { showResult(); return; }
+   showQuestion();
+ }
+ function prev() {
+   if (current > 0) { current--; showQuestion(); }
+ }
+ function showResult() {
+   document.getElementById("test").style.display = "none";
+   document.getElementById("result").style.display = "block";
+   document.getElementById("resultText").innerText = "测试完成！你的结果已生成。";
+ }
+ </script>
+ </body>
+ </html>
